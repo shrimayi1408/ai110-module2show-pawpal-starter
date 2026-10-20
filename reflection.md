@@ -1,6 +1,9 @@
 # PawPal+ Project Reflection
 
 ## 1. System Design
+- Add a pet
+- Generate a user plan based on owner preferences/info
+- Add tasks
 
 **a. Initial design**
 
