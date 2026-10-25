@@ -1,120 +1,74 @@
 """PawPal+ logic layer: backend classes for pets, owners, tasks, and scheduling."""
 
-import datetime
 from dataclasses import dataclass, field
 from datetime import date, time
-from enum import Enum
-from typing import Dict, List, Optional, Tuple
-
-#enum classes for task types and priority levels
-class TaskType(Enum):
-    WALK = "walk"
-    FEEDING = "feeding"
-    GROOMING = "grooming"
-    MEDICATION = "medication"
-    PLAY = "play"
-class Priority(Enum):
-    LOW = 1
-    MEDIUM = 2
-    HIGH = 3
-
-
-@dataclass
-class TimeWindow:
-    start: time
-    end: time
-
-    def duration(self) -> int:
-        pass
-
-    def contains(self, t: time) -> bool:
-        pass
+from typing import List, Optional, Tuple
 
 
 @dataclass
 class Task:
-    title: str
-    task_type: TaskType
-    duration_minutes: int  # time preference: the task should not run longer than this
-    priority: Priority
-    preferred_time: Optional[time] = None  # time preference: when in the day (e.g. morning, evening)
+    description: str
+    time: time
+    frequency: str = "once"  # "once", "daily", or "weekly"
     completed_on: Optional[date] = None  # resets itself: only "done" if completed today
 
     def mark_complete(self) -> None:
-        pass
+        """Record that this task was completed today."""
+        self.completed_on = date.today()
 
     def is_completed(self) -> bool:
-        pass
-
-    def fits_in(self, window: TimeWindow) -> bool:
-        pass
+        """Return True if this task was completed today."""
+        return self.completed_on == date.today()
 
 
-# eq=False keeps Pet hashable (identity-based) so it can be a dict key in Owner.tasks
-@dataclass(eq=False)
+@dataclass
 class Pet:
     name: str
     species: str
     age: int
+    tasks: List[Task] = field(default_factory=list)
+
+    def add_task(self, task: Task) -> None:
+        """Add a task to this pet (the pet must already be added to its owner, or the Scheduler won't see it)."""
+        self.tasks.append(task)
 
 
 @dataclass
 class Owner:
     name: str
-    available_times: List[TimeWindow] = field(default_factory=list)
-    tasks: Dict[Pet, List[Task]] = field(default_factory=dict)  # pet -> that pet's tasks
+    pets: List[Pet] = field(default_factory=list)
 
     def add_pet(self, pet: Pet) -> None:
-        pass
+        """Register a pet with this owner."""
+        self.pets.append(pet)
 
     def add_task(self, pet: Pet, task: Task) -> None:
-        pass
+        """Add a task to a pet, registering the pet with this owner if needed."""
+        if pet not in self.pets:
+            self.add_pet(pet)
+        pet.add_task(task)
 
     def get_all_tasks(self) -> List[Tuple[Pet, Task]]:
-        pass
-
-    def set_available_time(self, window: TimeWindow) -> None:
-        pass
-
-
-@dataclass
-class ScheduledTask:
-    task: Task
-    start_time: time
-    end_time: time
-    reason: str
-
-
-@dataclass
-class DailyPlan:
-    owner: Owner
-    pet: Pet
-    date: datetime.date = field(init=False, default_factory=datetime.date.today)  # filled in automatically
-    scheduled: List[ScheduledTask] = field(default_factory=list)
-    unscheduled: List[Task] = field(default_factory=list)
-
-    def total_minutes(self) -> int:
-        pass
-
-    def display(self) -> str:
-        pass
+        """Return every task across all of this owner's pets as (pet, task) pairs."""
+        return [(pet, task) for pet in self.pets for task in pet.tasks]
 
 
 @dataclass
 class Scheduler:
     owner: Owner
 
-    def get_daily_schedule(self, pet: Pet) -> List[Task]:
+    def get_daily_schedule(self) -> List[Tuple[Pet, Task]]:
+        """Return all of the owner's tasks across every pet, sorted by time."""
+        return self.sort_by_time(self.owner.get_all_tasks())
+
+    def sort_by_time(self, tasks: List[Tuple[Pet, Task]]) -> List[Tuple[Pet, Task]]:
+        """Return the (pet, task) pairs ordered by task time, earliest first."""
+        return sorted(tasks, key=lambda pair: pair[1].time)
+
+    def filter_tasks(self, pet_name: Optional[str] = None, completed: Optional[bool] = None) -> List[Tuple[Pet, Task]]:
+        """Return tasks filtered by pet name and/or completion status (not yet implemented)."""
         pass
 
-    def generate_daily_plan(self, pet: Pet) -> DailyPlan:
-        pass
-
-    def sort_by_priority(self, tasks: List[Task]) -> List[Task]:
-        pass
-
-    def fit_to_availability(self, tasks: List[Task]) -> List[ScheduledTask]:
-        pass
-
-    def explain_choice(self, task: Task) -> str:
+    def detect_conflicts(self) -> List[Tuple[Task, Task]]:
+        """Return pairs of tasks scheduled at conflicting times (not yet implemented)."""
         pass

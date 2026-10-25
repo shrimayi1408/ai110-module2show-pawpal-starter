@@ -1,89 +1,39 @@
 classDiagram
-    class Owner {
-        +str name
-        +List~TimeWindow~ available_times
-        +Dict~Pet, List~Task~~ tasks
-        +add_pet(pet) void
-        +add_task(pet, task) void
-        +get_all_tasks() List~Tuple~
-        +set_available_time(window) void
+    class Task {
+        +str description
+        +time time
+        +str frequency
+        +date completed_on
+        +mark_complete() void
+        +is_completed() bool
     }
 
     class Pet {
         +str name
         +str species
         +int age
+        +List~Task~ tasks
+        +add_task(task) void
     }
 
-    class Task {
-        +str title
-        +TaskType task_type
-        +int duration_minutes
-        +Priority priority
-        +time preferred_time
-        +date completed_on
-        +mark_complete() void
-        +is_completed() bool
-        +fits_in(window) bool
-    }
+    note for Pet "Pet must be added to its Owner first, or the Scheduler won't see its tasks"
 
-    class TimeWindow {
-        +time start
-        +time end
-        +duration() int
-        +contains(time) bool
+    class Owner {
+        +str name
+        +List~Pet~ pets
+        +add_pet(pet) void
+        +add_task(pet, task) void
+        +get_all_tasks() List~Tuple~
     }
 
     class Scheduler {
         +Owner owner
-        +get_daily_schedule(pet) List~Task~
-        +generate_daily_plan(pet) DailyPlan
-        +sort_by_priority(tasks) List~Task~
-        +fit_to_availability(tasks) List~ScheduledTask~
-        +explain_choice(task) str
+        +get_daily_schedule() List~Tuple~
+        +sort_by_time(tasks) List~Tuple~
+        +filter_tasks(pet_name, completed) List~Tuple~
+        +detect_conflicts() List~Tuple~
     }
 
-    class ScheduledTask {
-        +Task task
-        +time start_time
-        +time end_time
-        +str reason
-    }
-
-    class DailyPlan {
-        +Owner owner
-        +Pet pet
-        +date date
-        +List~ScheduledTask~ scheduled
-        +List~Task~ unscheduled
-        +total_minutes() int
-        +display() str
-    }
-
-    class TaskType {
-        <<enumeration>>
-        WALK
-        FEEDING
-        GROOMING
-        MEDICATION
-        PLAY
-    }
-
-    class Priority {
-        <<enumeration>>
-        LOW
-        MEDIUM
-        HIGH
-    }
-
-    Owner "1" --> "*" Pet : owns
-    Owner "1" --> "*" Task : prescribes (pet, task)
-    Owner "1" --> "*" TimeWindow : available during
-    Task --> TaskType
-    Task --> Priority
-    Scheduler --> Owner : reads
-    Scheduler ..> DailyPlan : creates
-    DailyPlan --> Owner
-    DailyPlan --> Pet
-    DailyPlan "1" o-- "*" ScheduledTask : contains
-    ScheduledTask --> Task
+    Owner "1" --> "*" Pet : manages
+    Pet "1" --> "*" Task : has
+    Scheduler --> Owner : reads get_all_tasks()

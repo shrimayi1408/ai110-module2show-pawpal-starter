@@ -53,6 +53,26 @@ Paste a sample of your app's CLI or Streamlit output here so a reader can see wh
 #   09:00 — Feeding (10 min) [priority: high]
 #   ...
 ```
+(based on owner)-
+Today's Schedule for Jordan
+----------------------------------------
+[ ] 07:30  Buddy: Morning walk (daily)
+[ ] 08:00  Whiskers: Breakfast (daily)
+[ ] 12:15  Whiskers: Playtime (once)
+[ ] 18:00  Buddy: Evening grooming (weekly)
+
+## Implementation Summary:
+
+The logic layer lives in `pawpal_system.py` and is built from four dataclasses. `main.py` is a small demo script that uses them.
+
+- **`Task`**: one care activity (description, time of day, frequency, and the date it was last completed). `is_completed()` is only true if it was completed today, so completion resets each day.
+- **`Pet`**: a pet's details plus its own list of tasks, with `add_task()`.
+- **`Owner`**: manages multiple pets. `add_task(pet, task)` registers the pet if needed and adds the task, and `get_all_tasks()` returns every pet's tasks together as `(pet, task)` pairs.
+- **`Scheduler`**: the "brain". It holds an `Owner` and always reads tasks through `owner.get_all_tasks()`, never from a single pet, so one schedule covers every pet. `get_daily_schedule()` sorts them by time with `sort_by_time()`.
+
+**How they work together:** `Owner` has many `Pet`s, each `Pet` has many `Task`s, and `Scheduler` reads across all of them through the owner. A pet must be added to its owner (`Owner.add_pet`) before its tasks are visible to the scheduler.
+
+**Not built yet:** `filter_tasks()`, `detect_conflicts()`, and recurring-task logic (`frequency` is stored but not used yet).
 
 ## 🧪 Testing PawPal+
 

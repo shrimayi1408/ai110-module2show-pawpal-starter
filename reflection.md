@@ -34,7 +34,42 @@ How they connect:
 Definitely
 - If yes, describe at least one change and why you made it.
 I made so many changes: 1 example
-Owner tasks: Owner.tasks is a Dict[Pet, List[Task]]. I removed Owner.pets because the dict's keys are the pets. add_pet registers a pet with an empty list. add_task(pet, task) adds to that pet's list, and get_all_tasks() returns (pet, task) pairs.
+
+## Missing relationships
+Tasks can be added for a pet the owner doesn't manage.
+
+Owner.add_task(pet, task) takes any Pet.
+If that pet isn't in owner.pets, get_all_tasks() never sees it, so the task silently vanishes from the schedule.
+Fix: have add_task add the pet if it's missing, or raise an error.
+detect_conflicts() returns (Task, Task) pairs.
+
+It can't say which pets are involved, which is the interesting part when one owner is double-booked.
+It should return (pet, task) pairs like the other methods.
+Pet names aren't unique.
+
+filter_tasks(pet_name=...) is ambiguous with two pets named "Max".
+Reject duplicate names in add_pet, or filter by Pet object.
+## Logic bottlenecks
+is_completed() resets daily, even for "once" tasks.
+
+A one-time task finished yesterday would show as undone today and reappear on the schedule.
+The reset should apply only to recurring tasks. For "once", any completed_on value should mean done.
+"weekly" has no way to say which day.
+
+There is no weekday or start date on Task, so get_daily_schedule() can't tell whether a weekly task is due today.
+Add a weekday or start_date field, or drop "weekly" for now.
+Conflict detection is limited to identical times.
+
+A Task has a start time but no duration, so you can only catch exact matches.
+A walk at 8:00 and a feeding at 8:15 can't be flagged as overlapping.
+Decide whether that's acceptable, or add a duration_minutes field.
+frequency is an unchecked string.
+
+A typo like "dailly" would behave like an unknown value.
+Validate it in Task (for example in __post_init__), or use a small enum later.
+Minor: the field time: time has the same name as its type. It works today, but it breaks if you ever give it a default value. Renaming it to due_time avoids that.
+
+The first two logic problems matter most, because they produce wrong schedules rather than just awkward code. Do you want me to apply fixes for items 1 and 2 in the relationships list and the first two bottlenecks?
 
 ## 2. Scheduling Logic and Tradeoffs
 
@@ -55,7 +90,9 @@ Owner tasks: Owner.tasks is a Dict[Pet, List[Task]]. I removed Owner.pets becaus
 **a. How you used AI**
 
 - How did you use AI tools during this project (for example: design brainstorming, debugging, refactoring)?
+Design brainstorming, adding classes and methods most appropriate. choosing how to make my schedule was the least straight-forward.
 - What kinds of prompts or questions were most helpful?
+The most helpful ones were when i asked it what i wanted to do, and what are all teh changes i needed to make. so this would give me just text, no actual code changes so i can review and understand on my own. I rejected the over-engineered ones and I still have yet to resolve some differences like daily schedule being about the owner and not the individual pet schedule. I have accepted all the known gaps as of now and plan on changing it later, focusing on code structure and coherent relationships.
 
 **b. Judgment and verification**
 
