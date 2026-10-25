@@ -2,11 +2,10 @@ classDiagram
     class Owner {
         +str name
         +List~TimeWindow~ available_times
-        +Dict preferences
-        +List~Pet~ pets
+        +Dict~Pet, List~Task~~ tasks
         +add_pet(pet) void
         +add_task(pet, task) void
-        +get_all_tasks() List~Task~
+        +get_all_tasks() List~Tuple~
         +set_available_time(window) void
     }
 
@@ -14,10 +13,6 @@ classDiagram
         +str name
         +str species
         +int age
-        +List~Task~ tasks
-        +add_task(task) void
-        +remove_task(task) void
-        +get_daily_schedule() List~Task~
     }
 
     class Task {
@@ -25,9 +20,10 @@ classDiagram
         +TaskType task_type
         +int duration_minutes
         +Priority priority
-        +str preferred_time
-        +bool completed
+        +time preferred_time
+        +date completed_on
         +mark_complete() void
+        +is_completed() bool
         +fits_in(window) bool
     }
 
@@ -40,7 +36,8 @@ classDiagram
 
     class Scheduler {
         +Owner owner
-        +generate_daily_plan() DailyPlan
+        +get_daily_schedule(pet) List~Task~
+        +generate_daily_plan(pet) DailyPlan
         +sort_by_priority(tasks) List~Task~
         +fit_to_availability(tasks) List~ScheduledTask~
         +explain_choice(task) str
@@ -48,13 +45,14 @@ classDiagram
 
     class ScheduledTask {
         +Task task
-        +Pet pet
         +time start_time
         +time end_time
         +str reason
     }
 
     class DailyPlan {
+        +Owner owner
+        +Pet pet
         +date date
         +List~ScheduledTask~ scheduled
         +List~Task~ unscheduled
@@ -79,12 +77,13 @@ classDiagram
     }
 
     Owner "1" --> "*" Pet : owns
+    Owner "1" --> "*" Task : prescribes (pet, task)
     Owner "1" --> "*" TimeWindow : available during
-    Pet "1" --> "*" Task : has
     Task --> TaskType
     Task --> Priority
     Scheduler --> Owner : reads
     Scheduler ..> DailyPlan : creates
+    DailyPlan --> Owner
+    DailyPlan --> Pet
     DailyPlan "1" o-- "*" ScheduledTask : contains
     ScheduledTask --> Task
-    ScheduledTask --> Pet

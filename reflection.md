@@ -8,14 +8,33 @@
 **a. Initial design**
 
 - Briefly describe your initial UML design.
+I split PawPal+ into three kinds of classes. Data classes hold information. A scheduler holds the logic. Output classes hold the result. This keeps the owner and pet classes simple, and all the "when does each task happen" reasoning lives in one place.
+
 - What classes did you include, and what responsibilities did you assign to each?
+Class	Responsibility
+Owner: Represents the person. Holds their name, available time windows, preferences and list of pets. Lets you add pets, add tasks, list every task across all pets, and set available times.
+    Pet: Represents one animal (name, species, age). Owns that pet's list of care tasks and can add or remove tasks and return its daily schedule.
+Task: One care activity such as a walk, feeding or grooming. Stores title, type, duration, priority, preferred time and completed status. Can mark itself complete and check whether it fits in a time window.
+    TimeWindow: A block of time when the owner is free (start and end). Reports its duration and whether a given time falls inside it.
+Scheduler: The "brain". Takes an owner, sorts tasks by priority, fits them into the owner's available windows, explains why each task was placed where it was, and produces the daily plan.
+    ScheduledTask: A task that has been placed in the day. Pairs a Task and Pet with a start time, end time and the reason for the choice.
+DailyPlan: The final output for one date. Holds the scheduled tasks and the tasks that didn't fit, can total the minutes planned, and can display the plan as text.
+    TaskType (enum): The allowed kinds of task: walk, feeding, grooming, medication, play.
+Priority (enum)	The allowed priority levels: low, medium, high.
+
+How they connect:
+    An Owner has many Pets and many TimeWindows.
+    A Pet has many Tasks.
+    The Scheduler reads an Owner and creates a DailyPlan.
+    A DailyPlan contains many ScheduledTasks.
 
 **b. Design changes**
 
 - Did your design change during implementation?
+Definitely
 - If yes, describe at least one change and why you made it.
-
----
+I made so many changes: 1 example
+Owner tasks: Owner.tasks is a Dict[Pet, List[Task]]. I removed Owner.pets because the dict's keys are the pets. add_pet registers a pet with an empty list. add_task(pet, task) adds to that pet's list, and get_all_tasks() returns (pet, task) pairs.
 
 ## 2. Scheduling Logic and Tradeoffs
 
