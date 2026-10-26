@@ -307,3 +307,130 @@ def test_get_upcoming_lists_tomorrows_daily_tasks_only():
     assert [t.description for _, t in sched.get_upcoming(tomorrow, frequency="daily")] == ["Walk"]
     assert [t.description for _, t in sched.get_upcoming(tomorrow)] == ["Walk"]  # the bath is a week out
     assert sched.get_upcoming(date.today() + timedelta(days=7))[0][1].description == "Bath"
+
+
+# --- required coverage: sorting, recurrence, conflict detection (plus edge cases) ---
+
+
+def test_sort_by_time_is_chronological_across_the_whole_day():
+    # 9:00 vs 10:00 would sort wrongly as strings ("10:00" < "9:00"); midnight and 23:59 are the extremes
+    owner, _, sched = make(
+        [Task("late", dtime(23, 59)), Task("ten", dtime(10, 0)), Task("midnight", dtime(0, 0)), Task("nine", dtime(9, 0))]
+    )
+    ordered = sched.sort_by_time(owner.get_all_tasks())
+    assert [t.description for _, t in ordered] == ["midnight", "nine", "ten", "late"]
+
+
+def test_sort_by_time_is_stable_for_equal_times_and_handles_empty_input():
+    owner, _, sched = make([Task("first", dtime(8, 0)), Task("second", dtime(8, 0))])
+    ordered = sched.sort_by_time(owner.get_all_tasks())
+    assert [t.description for _, t in ordered] == ["first", "second"]
+    assert sched.sort_by_time([]) == []
+
+
+def test_sort_tasks_does_not_modify_its_input():
+    owner, _, sched = make([Task("b", dtime(9, 0)), Task("a", dtime(7, 0))])
+    pairs = owner.get_all_tasks()
+    before = list(pairs)
+    sched.sort_tasks(pairs, NOW)
+    assert pairs == before
+
+
+def test_overdue_low_priority_sorts_before_upcoming_high_priority():
+    _, _, sched = make(
+        [
+            Task("high later", dtime(18, 0), priority="high", due_date=NOW.date()),
+            Task("low missed", dtime(8, 0), priority="low", due_date=NOW.date()),
+        ]
+    )
+    names = [t.description for _, t in sched.get_daily_schedule(NOW)]  # NOW is 10:00
+    assert names == ["low missed", "high later"]
+
+
+@pytest.mark.parametrize(
+    "done, frequency, expected",
+    [
+        (date(2030, 1, 31), "daily", date(2030, 2, 1)),  # month rollover
+        (date(2030, 12, 31), "daily", date(2031, 1, 1)),  # year rollover
+        (date(2028, 2, 28), "daily", date(2028, 2, 29)),  # leap year
+        (date(2030, 2, 28), "daily", date(2030, 3, 1)),  # non-leap year
+        (date(2030, 12, 28), "weekly", date(2031, 1, 4)),  # weekly across the new year
+    ],
+)
+def test_next_occurrence_handles_calendar_rollovers(done, frequency, expected):
+    task = Task("Walk", dtime(8, 0), frequency, due_date=done)
+    task.completed_on = done
+    assert task.next_occurrence().due_date == expected
+
+
+def test_next_occurrence_is_independent_of_the_original():
+    owner, pet, _ = make([])
+    walk = Task("Walk", dtime(8, 0), "daily")
+    owner.add_task(pet, walk)
+    upcoming = walk.mark_complete()
+    assert upcoming.pet is pet
+    upcoming.description = "Long walk"
+    assert walk.description == "Walk"
+    assert walk.is_completed() and not upcoming.is_completed()
+
+
+def test_completing_the_next_occurrence_chains_another_day():
+    owner, pet, _ = make([])
+    walk = Task("Walk", dtime(8, 0), "daily")
+    owner.add_task(pet, walk)
+    second = walk.mark_complete()
+    third = second.mark_complete()
+    assert third.due_date == date.today() + timedelta(days=1)  # completion date drives the next due date
+    assert len(pet.tasks) == 3
+
+
+def test_duplicate_times_on_same_pet_are_flagged_as_a_conflict():
+    _, pet, sched = make([Task("Walk", dtime(8, 0)), Task("Feed", dtime(8, 0))])
+    conflicts = sched.detect_conflicts(NOW.date())
+    assert len(conflicts) == 1
+    flagged_pet, a, b = conflicts[0]
+    assert flagged_pet is pet
+    assert {a.description, b.description} == {"Walk", "Feed"}
+
+
+def test_duplicate_times_across_pets_are_flagged_as_an_owner_conflict():
+    owner = Owner("Jordan")
+    owner.add_task(Pet("Buddy", "dog", 4), Task("Walk", dtime(8, 0)))
+    owner.add_task(Pet("Whiskers", "cat", 2), Task("Feed", dtime(8, 0)))
+    sched = Scheduler([owner])
+    assert len(sched.detect_owner_conflicts(NOW.date())) == 1
+
+
+def test_three_mutually_overlapping_tasks_give_three_conflict_pairs():
+    _, _, sched = make([Task(n, dtime(8, 0), duration=30) for n in "abc"])
+    assert len(sched.detect_conflicts(NOW.date())) == 3
+
+
+def test_task_contained_inside_a_longer_task_is_a_conflict():
+    _, _, sched = make([Task("Long", dtime(8, 0), duration=60), Task("Short", dtime(8, 20), duration=10)])
+    assert len(sched.detect_conflicts(NOW.date())) == 1
+
+
+def test_conflicts_only_consider_tasks_due_that_day():
+    _, _, sched = make(
+        [
+            Task("Walk", dtime(8, 0), due_date=date(2030, 1, 7)),
+            Task("Feed", dtime(8, 0), due_date=date(2030, 1, 9)),
+        ]
+    )
+    assert sched.detect_conflicts(date(2030, 1, 7)) == []
+
+
+def test_empty_scheduler_and_empty_pet_do_not_crash():
+    assert Scheduler([]).get_daily_schedule(NOW) == []
+    assert Scheduler([]).detect_conflicts(NOW.date()) == []
+    _, _, sched = make([])
+    assert sched.get_daily_schedule(NOW) == []
+    assert sched.detect_conflicts(NOW.date()) == []
+    assert sched.detect_owner_conflicts(NOW.date()) == []
+
+
+def test_task_exactly_at_now_is_not_overdue():
+    task = Task("Walk", dtime(10, 0), due_date=NOW.date())
+    assert not task.is_overdue(NOW)
+    assert Task("Walk", dtime(9, 59), due_date=NOW.date()).is_overdue(NOW)

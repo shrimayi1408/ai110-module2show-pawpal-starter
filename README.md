@@ -80,18 +80,35 @@ The logic layer lives in `pawpal_system.py` and is built from four dataclasses. 
 ## 🧪 Testing PawPal+
 
 ```bash
-# Run the full test suite:
-pytest
-
-# Run with coverage:
-pytest --cov
+# Run the full test suite (from the project root, with the venv active):
+python -m pytest
 ```
 
-Sample test output:
+### What the tests cover
+
+The 49 tests in `tests/test_pawpal.py` exercise the logic layer in `pawpal_system.py` (no UI):
+
+- **Sorting correctness**: tasks come back in chronological order across the whole day (`00:00`, `09:00`, `10:00`, `23:59`), equal times keep their input order, empty input is fine, the input list isn't mutated, and the daily schedule orders overdue first, then priority, then time.
+- **Recurrence logic**: completing a daily task creates a fresh task for the next day (weekly: 7 days later) on the same pet, one-off tasks create nothing, completing twice never duplicates, and month, year and leap-year rollovers land on the right date.
+- **Conflict detection**: overlapping and duplicate start times are flagged for the same pet, different pets of one owner are flagged as owner conflicts, containment and three-way overlaps are caught, and back-to-back tasks are not conflicts.
+- **Other**: overdue boundaries, weekly due dates, the free-slot suggestion, filtering, duplicate pet names, and empty owners/pets not crashing.
+
+### Test results
 
 ```
-28 passed
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/shrimayisinkar/personalProj/ai-course/ai110-module2show-pawpal-starter
+collected 49 items
+
+tests/test_pawpal.py .................................................   [100%]
+
+============================== 49 passed in 0.02s ==============================
 ```
+
+### Confidence Level: ⭐⭐⭐⭐ (4/5)
+
+All 49 tests pass, and they cover the three core behaviors (sorting, recurrence, conflicts) plus their boundaries. I stopped at four stars because a few behaviors are untested or unsettled: zero-duration tasks never conflict, a weekly task completed late drifts to a new weekday, tasks that run past midnight don't wrap, and the Streamlit UI has no automated tests.
 
 ## 📐 Smarter Scheduling
 
