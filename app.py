@@ -8,6 +8,12 @@ st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
 st.title("🐾 PawPal+")
 
+def time_range(task):
+    """Format a task's span like '08:00-08:30' (wraps past midnight)."""
+    end = task.end_minute
+    return f"{task.time:%H:%M}-{(end // 60) % 24:02d}:{end % 60:02d}"
+
+
 WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
 if "owners" not in st.session_state:
@@ -112,19 +118,36 @@ with schedule_area:
     if not schedule:
         st.info("Nothing scheduled today. Add tasks below.")
     else:
-        for pet, first, second in scheduler.detect_conflicts(now.date()):
-            slot = scheduler.suggest_free_slot(pet, second, now.date())
-            hint = f" Try moving {second.description} to {slot:%H:%M}." if slot else ""
+        pending = [t for _, t in schedule if not t.is_completed()]
+        pet_conflicts = scheduler.detect_conflicts(now.date())
+        owner_conflicts = scheduler.detect_owner_conflicts(now.date()) if owner_wide else []
+        n_conflicts = len(pet_conflicts) + len(owner_conflicts)
+
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Tasks today", len(schedule))
+        m2.metric("Still to do", len(pending))
+        m3.metric("Overdue", sum(t.is_overdue(now) for t in pending))
+
+        if n_conflicts == 0:
+            st.success("No scheduling conflicts today. Everything fits.")
+        else:
             st.warning(
-                f"{scheduler.pet_label(pet)}: {first.description} ({first.time:%H:%M}, {first.duration} min) "
-                f"overlaps {second.description} ({second.time:%H:%M}, {second.duration} min).{hint}"
+                f"**{n_conflicts} scheduling conflict{'s' if n_conflicts != 1 else ''} today.** "
+                "Nothing was changed. Adjust a time below or follow the suggestion."
             )
-        if owner_wide:
-            for conflict_owner, pet_a, a, pet_b, b in scheduler.detect_owner_conflicts(now.date()):
-                st.warning(
-                    f"{conflict_owner.name} can't do both: {scheduler.pet_label(pet_a)}'s {a.description} "
-                    f"({a.time:%H:%M}) and {scheduler.pet_label(pet_b)}'s {b.description} ({b.time:%H:%M}) overlap."
-                )
+        for pet, first, second in pet_conflicts:
+            slot = scheduler.suggest_free_slot(pet, second, now.date())
+            hint = f"\n\n💡 Try moving **{second.description}** to **{slot:%H:%M}**." if slot else "\n\n💡 No free slot is left today."
+            st.warning(
+                f"**{scheduler.pet_label(pet)}** has two tasks at the same time:\n\n"
+                f"- {first.description}, {time_range(first)}\n- {second.description}, {time_range(second)}{hint}"
+            )
+        for conflict_owner, pet_a, a, pet_b, b in owner_conflicts:
+            st.warning(
+                f"**{conflict_owner.name}** can't do both at once:\n\n"
+                f"- {scheduler.pet_label(pet_a)}: {a.description}, {time_range(a)}\n"
+                f"- {scheduler.pet_label(pet_b)}: {b.description}, {time_range(b)}"
+            )
 
         widths = [1, 1.5, 2, 3, 1.5, 2.5]
         for col, title in zip(st.columns(widths), ["Done", "Time", "Pet", "Task", "Priority", ""]):
@@ -152,3 +175,28 @@ with schedule_area:
                 st.write(f"{task.time:%H:%M} ({task.duration}m) · {scheduler.pet_label(pet)} · {task.description} · {task.priority}")
         else:
             st.caption("Nothing queued yet. Daily tasks you complete today show up here for tomorrow.")
+
+    with st.expander("All tasks (sort and filter)"):
+        f1, f2 = st.columns(2)
+        pet_names = sorted({p.name for o in owners for p in o.pets})
+        pet_filter = f1.selectbox("Pet", ["All pets"] + pet_names, key="filter-pet")
+        status_filter = f2.radio("Status", ["All", "Pending", "Done"], horizontal=True, key="filter-status")
+        completed = {"All": None, "Pending": False, "Done": True}[status_filter]
+        matches = scheduler.filter_tasks(None if pet_filter == "All pets" else pet_filter, completed)
+        if matches:
+            st.table(
+                [
+                    {
+                        "Time": time_range(task),
+                        "Pet": scheduler.pet_label(pet),
+                        "Task": task.description,
+                        "Repeats": task.frequency,
+                        "Due": task.due_date.strftime("%a %b %d"),
+                        "Priority": task.priority,
+                        "Status": "Done" if task.is_completed() else "Pending",
+                    }
+                    for pet, task in scheduler.sort_by_time(matches)
+                ]
+            )
+        else:
+            st.caption("No tasks match those filters.")

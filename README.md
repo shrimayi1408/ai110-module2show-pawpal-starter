@@ -66,6 +66,17 @@ Today's Schedule for Jordan
 
 In the Streamlit app (`streamlit run app.py`) the schedule is a persistent area at the top of the page, with a "Mark complete" button per task.
 
+## ✨ Features
+
+- **Sorting by time**: `sort_by_time()` orders tasks earliest first using `sorted()` with a `datetime.time` key, so `9:00` correctly comes before `10:00`. The sort is stable, so equal times keep their input order.
+- **Smart daily schedule**: `get_daily_schedule()` collects today's due tasks across every owner's pets and orders them overdue first, then by priority (high, medium, low), then by time.
+- **Filtering**: `filter_tasks()` narrows tasks by pet name (case-insensitive), completion status, or both.
+- **Conflict warnings**: `detect_conflicts()` flags overlapping tasks for the same pet by comparing start and end times (duration-aware, so back-to-back tasks are fine). It sorts by start time and stops early, so it is O(n log n) in the common case. `detect_owner_conflicts()` adds an optional check across different pets of one owner.
+- **Free-slot suggestions**: `suggest_free_slot()` scans forward in 5-minute steps for the first time a task fits without overlapping, or reports that none is left today.
+- **Daily and weekly recurrence**: completing a daily or weekly task adds the next copy (+1 or +7 days, using `timedelta`, so month, year and leap-year rollovers just work). Completing twice never duplicates, and one-off tasks create nothing.
+- **Overdue carry-over**: an unfinished task stays on the schedule after its due date and is marked overdue until it is done.
+- **Multi-owner, multi-pet**: duplicate pet names are rejected within an owner and labelled `Rex (Ann)` across owners.
+
 ## Implementation Summary
 
 The logic layer lives in `pawpal_system.py` and is built from four dataclasses. `main.py` is a small demo script and `app.py` is the Streamlit UI.
@@ -149,12 +160,113 @@ All of this lives in `pawpal_system.py`. `Scheduler` works across every owner's 
 
 ## 📸 Demo Walkthrough
 
-Describe your app in numbered steps so a reader can follow along without watching a video:
+### The app (`streamlit run app.py`)
 
-1. <!-- Describe this step -->
-2. <!-- Describe this step -->
-3. <!-- Describe this step -->
-4. <!-- Describe this step -->
-5. <!-- Add more steps as needed -->
+**What you can do**
+- Add owners and pets (name, species, age), and add tasks to a pet with a time, duration, priority, and frequency (once, daily or weekly, with a weekday for weekly).
+- See **Today's Schedule** pinned at the top of the page, with summary counts, a "Mark complete" button per task, and a "Tomorrow's daily tasks" panel.
+- Open **All tasks (sort and filter)** to view every task in a table, filtered by pet and by pending or done.
+- Tick the checkbox to also warn when one owner has overlapping tasks for different pets.
 
-**Screenshot or video** *(optional)*: <!-- Insert a screenshot or link to a demo video here -->
+**Example workflow**
+1. Add a pet, for example "Mochi" (dog, age 2).
+2. Add a task: "Morning walk" at 08:00 for 30 minutes, priority high, daily.
+3. Add a second task: "Medication" at 08:15 for 10 minutes. Because it overlaps the walk, a warning appears at the top of the schedule naming both tasks, showing their time ranges, and suggesting a free time such as 08:30.
+4. Fix the clash by re-adding the task at the suggested time. The banner switches to a green "No scheduling conflicts" message.
+5. Click **Mark complete** on the walk. It stays on today's list as done, and tomorrow's walk appears in "Tomorrow's daily tasks".
+
+**Scheduler behaviors on display**
+- **Sorting**: today's list is ordered overdue first, then priority, then time.
+- **Conflict warnings**: `st.warning` messages with the pet, both tasks, their time ranges and a suggested fix. They never move or block anything.
+- **Recurrence**: completing a daily or weekly task queues its next occurrence automatically.
+- **Filtering**: the all-tasks table can be narrowed by pet and by status.
+
+### The terminal demo (`python main.py`)
+
+Sample output (dates depend on the day you run it):
+
+```
+
+As added (unsorted)
+------------------------------------------------------------
+[ ] 18:00  Buddy: Evening grooming (daily, low, 20 min)
+[ ] 07:30  Buddy: Morning walk (daily, high, 30 min)
+[ ] 16:00  Buddy: Bath (weekly, low, 30 min)
+[ ] 07:45  Buddy: Medication (daily, high, 5 min)
+[ ] 12:15  Whiskers: Playtime (once, medium, 15 min)
+[ ] 08:00  Whiskers: Breakfast (daily, high, 10 min)
+
+sort_by_time()
+------------------------------------------------------------
+[ ] 07:30  Buddy: Morning walk (daily, high, 30 min)
+[ ] 07:45  Buddy: Medication (daily, high, 5 min)
+[ ] 08:00  Whiskers: Breakfast (daily, high, 10 min)
+[ ] 12:15  Whiskers: Playtime (once, medium, 15 min)
+[ ] 16:00  Buddy: Bath (weekly, low, 30 min)
+[ ] 18:00  Buddy: Evening grooming (daily, low, 20 min)
+
+Daily schedule (overdue, then priority, then time)
+------------------------------------------------------------
+[ ] 07:30  Buddy: Morning walk (daily, high, 30 min)
+[ ] 07:45  Buddy: Medication (daily, high, 5 min)
+[ ] 08:00  Whiskers: Breakfast (daily, high, 10 min)
+[ ] 12:15  Whiskers: Playtime (once, medium, 15 min)
+[ ] 16:00  Buddy: Bath (weekly, low, 30 min)
+[ ] 18:00  Buddy: Evening grooming (daily, low, 20 min)
+
+filter_tasks(pet_name='Buddy')
+------------------------------------------------------------
+[ ] 18:00  Buddy: Evening grooming (daily, low, 20 min)
+[x] 07:30  Buddy: Morning walk (daily, high, 30 min)
+[ ] 16:00  Buddy: Bath (weekly, low, 30 min)
+[ ] 07:45  Buddy: Medication (daily, high, 5 min)
+[ ] 07:30  Buddy: Morning walk (daily, high, 30 min)
+
+filter_tasks(completed=True)
+------------------------------------------------------------
+[x] 07:30  Buddy: Morning walk (daily, high, 30 min)
+[x] 08:00  Whiskers: Breakfast (daily, high, 10 min)
+
+filter_tasks(completed=False)
+------------------------------------------------------------
+[ ] 18:00  Buddy: Evening grooming (daily, low, 20 min)
+[ ] 16:00  Buddy: Bath (weekly, low, 30 min)
+[ ] 07:45  Buddy: Medication (daily, high, 5 min)
+[ ] 07:30  Buddy: Morning walk (daily, high, 30 min)
+[ ] 12:15  Whiskers: Playtime (once, medium, 15 min)
+[ ] 08:00  Whiskers: Breakfast (daily, high, 10 min)
+
+filter_tasks(pet_name='Buddy', completed=False)
+------------------------------------------------------------
+[ ] 18:00  Buddy: Evening grooming (daily, low, 20 min)
+[ ] 16:00  Buddy: Bath (weekly, low, 30 min)
+[ ] 07:45  Buddy: Medication (daily, high, 5 min)
+[ ] 07:30  Buddy: Morning walk (daily, high, 30 min)
+
+Recurring tasks: completing a task queues its next occurrence
+------------------------------------------------------------
+Buddy: Evening grooming (daily) done -> next due Mon 2026-10-26
+Buddy: Bath (weekly) done -> next due Sun 2026-11-01
+Whiskers: Playtime (once) done -> no next occurrence
+
+Schedule today (finished tasks stay visible, next occurrences wait)
+------------------------------------------------------------
+[ ] 07:45  Buddy: Medication (daily, high, 5 min)
+[x] 07:30  Buddy: Morning walk (daily, high, 30 min)
+[x] 08:00  Whiskers: Breakfast (daily, high, 10 min)
+[x] 12:15  Whiskers: Playtime (once, medium, 15 min)
+[x] 16:00  Buddy: Bath (weekly, low, 30 min)
+[x] 18:00  Buddy: Evening grooming (daily, low, 20 min)
+
+filter_tasks(completed=False): includes the queued next occurrences
+------------------------------------------------------------
+[ ] 07:45  Buddy: Medication (daily, high, 5 min)
+[ ] 07:30  Buddy: Morning walk (daily, high, 30 min)
+[ ] 18:00  Buddy: Evening grooming (daily, low, 20 min)
+[ ] 16:00  Buddy: Bath (weekly, low, 30 min)
+[ ] 08:00  Whiskers: Breakfast (daily, high, 10 min)
+
+Conflicts
+------------------------------------------------------------
+Buddy: Morning walk overlaps Medication; try Medication at 08:00
+```

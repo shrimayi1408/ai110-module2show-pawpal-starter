@@ -99,7 +99,6 @@ The most helpful ones were when i asked it what i wanted to do, and what are all
 - Describe one moment where you did not accept an AI suggestion as-is.
 - How did you evaluate or verify what the AI suggested?
 
----
 
 ## 4. Testing and Verification
 
@@ -128,3 +127,19 @@ The most helpful ones were when i asked it what i wanted to do, and what are all
 **c. Key takeaway**
 
 - What is one important thing you learned about designing systems or working with AI on this project?
+
+---
+
+## 6. Reflect on AI Strategy
+
+**Which AI coding assistant features were most effective for building the scheduler?**
+
+The most useful pattern was asking the assistant to review my design in plain text before it touched any code. When I asked "what do I want to do, and what changes do I need to make?", I got a list of gaps (tasks for pets the owner doesn't manage, `once` tasks resetting daily, weekly tasks with no day, conflict detection that only catches identical times). I could read, question and prioritize those myself instead of reviewing a pile of diffs. Once the design was settled, letting the assistant generate the class skeletons from the UML, then the sorting/filtering/conflict logic and the pytest suite, saved the most time. It was also good at drafting edge-case tests (recurrence, back-to-back tasks, empty schedules) that I then checked against the behavior I actually wanted.
+
+**One suggestion I rejected or modified to keep the design clean**
+
+The assistant offered more elaborate options than the project needed, such as extra fields and validation layers on `Task`. I rejected those and kept the three-part split: data classes (`Owner`, `Pet`, `Task`), one `Scheduler` that holds all the "when does it happen" logic, and `DailyPlan`/`ScheduledTask` as output. I also accepted a few known gaps on purpose, such as the daily schedule being owner-level rather than per-pet, and noted them to fix later. I chose to keep the code structure and the relationships between classes coherent rather than patch every edge case at once.
+
+**How separate chat sessions for different phases helped**
+
+Using a fresh session per phase (design/UML, implementation, then testing and documentation) kept each conversation focused on one question. The design session didn't get cluttered with debugging output, and the testing session started from the finished code rather than half-formed ideas. Each session began with a short summary of the previous result, which also forced me to state my decisions clearly. It was easier to tell which suggestions belonged to which phase, and I wasn't fighting stale context from an earlier design that had since changed.
