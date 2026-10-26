@@ -2,8 +2,16 @@ classDiagram
     class Task {
         +str description
         +time time
+        +int duration
         +str frequency
+        +str priority
+        +int weekday
+        +date due_date
         +date completed_on
+        +is_due(day) bool
+        +overlaps(other) bool
+        +is_overdue(now) bool
+        +next_occurrence() Task
         +mark_complete() void
         +is_completed() bool
     }
@@ -27,13 +35,17 @@ classDiagram
     }
 
     class Scheduler {
-        +Owner owner
-        +get_daily_schedule() List~Tuple~
+        +List~Owner~ owners
+        +get_daily_schedule(now) List~Tuple~
         +sort_by_time(tasks) List~Tuple~
+        +sort_tasks(tasks, now) List~Tuple~
+        +pet_label(pet) str
         +filter_tasks(pet_name, completed) List~Tuple~
-        +detect_conflicts() List~Tuple~
+        +detect_conflicts(day) List~Tuple~
+        +detect_owner_conflicts(day) List~Tuple~
+        +suggest_free_slot(pet, task, day, owner_wide) time
     }
 
     Owner "1" --> "*" Pet : manages
     Pet "1" --> "*" Task : has
-    Scheduler --> Owner : reads get_all_tasks()
+    Scheduler --> "*" Owner : reads get_all_tasks()
