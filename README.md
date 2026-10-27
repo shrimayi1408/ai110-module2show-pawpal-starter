@@ -66,7 +66,7 @@ Today's Schedule for Jordan
 
 In the Streamlit app (`streamlit run app.py`) the schedule is a persistent area at the top of the page, with a "Mark complete" button per task.
 
-## ✨ Features
+## Features
 
 - **Sorting by time**: `sort_by_time()` orders tasks earliest first using `sorted()` with a `datetime.time` key, so `9:00` correctly comes before `10:00`. The sort is stable, so equal times keep their input order.
 - **Smart daily schedule**: `get_daily_schedule()` collects today's due tasks across every owner's pets and orders them overdue first, then by priority (high, medium, low), then by time.
