@@ -117,10 +117,6 @@ tests/test_pawpal.py .................................................   [100%]
 ============================== 49 passed in 0.02s ==============================
 ```
 
-### Confidence Level: ⭐⭐⭐⭐ (4/5)
-
-All 49 tests pass, and they cover the three core behaviors (sorting, recurrence, conflicts) plus their boundaries. I stopped at four stars because a few behaviors are untested or unsettled: zero-duration tasks never conflict, a weekly task completed late drifts to a new weekday, tasks that run past midnight don't wrap, and the Streamlit UI has no automated tests.
-
 ## 📐 Smarter Scheduling
 
 All of this lives in `pawpal_system.py`. `Scheduler` works across every owner's pets, and `main.py` demos each feature in the terminal.
@@ -154,8 +150,8 @@ All of this lives in `pawpal_system.py`. `Scheduler` works across every owner's 
 
 ### Other
 
-| Feature | Method(s) | Notes |
-|---------|-----------|-------|
+| Feature             | Method(s)                                   |  Notes                                                       |
+|---------------------|---------------------------------------------|--------------------------------------------------------------|
 | Duplicate pet names | `Owner.add_pet()`, `Scheduler.pet_label()` | Same owner: rejected. Different owners: shown as `Rex (Ann)`. |
 
 ## 📸 Demo Walkthrough
